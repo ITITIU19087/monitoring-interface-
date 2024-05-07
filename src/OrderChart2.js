@@ -9,6 +9,13 @@ const OrderChart = () => {
     // Initialize state from localStorage if available
     const [buyData, setBuyData] = useState(() => JSON.parse(localStorage.getItem('buyData')) || null);
     const [sellData, setSellData] = useState(() => JSON.parse(localStorage.getItem('sellData')) || null);
+    useEffect(()=>{
+        const key = (event) => {
+            if (event.shiftKey && event.key === "X"){
+                localStorage.clear();
+            }
+        }
+    },[]);
 
     const socket = io('http://localhost:9999', {
         transports: ['websocket', 'polling']
@@ -84,6 +91,10 @@ const OrderChart = () => {
         const x = d3.scaleLinear().range([0, width / 4]);
         const y = d3.scaleBand().range([height, 0]).padding(0.1 );
 
+        const xScale = d3.scaleLinear().domain([0, d3.max(dataArray, d => d.orders)]).range([0, width]);
+
+        const yScale = d3.scaleBand().domain(dataArray.map(d => d.price)).range([0, height]).padding(0.1);
+
         y.domain(dataArray.map(d => d.price));
         x.domain([0, d3.max(dataArray, d => d.orders)]);
 
@@ -93,6 +104,7 @@ const OrderChart = () => {
             .attr("transform", `translate(${margin.left},${margin.top})`);
 
         const axisGap = 10;
+
 
         g.selectAll(".bar")
             .data(dataArray)
@@ -108,6 +120,23 @@ const OrderChart = () => {
                 }
             })
             .attr("width", d => x(d.orders));
+    
+        g.selectAll(".bar-text")
+            .data(dataArray)
+            .enter().append("text")
+            .attr("class", "bar-text")
+            .attr("y", d => y(d.price) + y.bandwidth() / 2) // Vertically center the text in the bar
+            .attr("x", d => {
+                // Position the text at the end of the bar, adjusting based on BUY or SELL
+                if (d.side === 'BUY') {
+                    return (width / 2) - x(d.orders) - axisGap - 5; // Position a bit left of the end for BUY
+                } else {
+                    return (width / 2) + x(d.orders) + axisGap + 5; // Position a bit right of the end for SELL
+                }
+            })
+            .attr("text-anchor", d => d.side === 'BUY' ? "end" : "start") // Align text based on BUY or SELL
+            .text(d => d.orders)
+            .attr("dy", ".35em"); // Adjust for vertical centering        
 
         const yAxisBuy = d3.axisLeft(y).tickValues([]);
         const yAxisSell = d3.axisRight(y).tickValues([]);
@@ -130,6 +159,7 @@ const OrderChart = () => {
             .attr("text-anchor", "middle")
             .text(d => d);
 
+    
         const buyAnnotationY = 10;
         const sellAnnotationY = buyAnnotationY + 30;
 
@@ -158,6 +188,7 @@ const OrderChart = () => {
             .attr("y", sellAnnotationY + 15)
             .attr("class", "annotation")
             .text("SELL orders");
+        
     };
 
     if (error) {
@@ -171,6 +202,7 @@ const OrderChart = () => {
                   .bar-sell { fill: green; }
                   .bar-buy { fill: red; }
                   .axis-text { font-size: 12px; fill: black; }
+                  .bar-text {font-size: 12px;}
                 `}
             </style>
             <svg id="chart"></svg>
